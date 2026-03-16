@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# main.py - EBET Aviator + FLUXO EXATO QUE VOCÊ MANDA + LOGS NO CONSOLE
+# main.py - EBET Aviator + IFRAME EXATO (provider-game-iframe) + PRINT EM TODO PASSO
 
 import os
 import sys
@@ -49,16 +49,17 @@ def send_telegram_text(msg, throttle=6):
 
 def screenshot_and_send(driver, label):
     try:
-        path = f"/tmp/{int(time.time())}_{label.replace(' ', '_')}.png"
+        path = f"/tmp/{int(time.time())}_{label.replace(' ', '_')[:30]}.png"
         driver.save_screenshot(path)
         send_telegram_text(f"📸 {label}")
-    except:
-        pass
+        print(f"   📸 Screenshot enviado: {label}")
+    except Exception as e:
+        print(f"   ❌ Falha ao enviar screenshot: {e}")
 
 def print_step(step):
-    print(f"\n{'='*80}")
+    print(f"\n{'='*85}")
     print(f"🚀 PASSO: {step}")
-    print(f"{'='*80}")
+    print(f"{'='*85}")
     send_telegram_text(f"📍 {step}")
 
 def safe_find_elements(driver, selector):
@@ -77,10 +78,12 @@ def click_aviator_image(driver):
             if "aviator" in src:
                 driver.execute_script("arguments[0].click();", img)
                 print("   ✅ Clique na imagem Aviator executado!")
+                screenshot_and_send(driver, "Clique Aviator OK")
                 return True
         except:
             continue
     print("   ⚠️ Imagem Aviator não encontrada")
+    screenshot_and_send(driver, "Falha - Imagem Aviator não encontrada")
     return False
 
 def coletar_historico_dom(driver):
@@ -128,9 +131,9 @@ def iniciar_scraper():
             print_step("1 - Abrindo Home EBET")
             driver.get(HOME_URL)
             time.sleep(8)
-            screenshot_and_send(driver, "Home EBET aberta")
+            screenshot_and_send(driver, "1 - Home EBET aberta")
 
-            print_step("2 - Clicando Aviator (primeira vez)")
+            print_step("2 - Clicando Aviator (1ª vez)")
             click_aviator_image(driver)
             time.sleep(5)
 
@@ -144,34 +147,30 @@ def iniciar_scraper():
                 password.send_keys(PASSWORD)
                 btn = driver.find_element(By.CSS_SELECTOR, "input.btn.btn-primary.btn-session")
                 driver.execute_script("arguments[0].click();", btn)
-                screenshot_and_send(driver, "Login enviado")
-                print("✅ Login enviado com sucesso")
+                screenshot_and_send(driver, "3 - Login enviado com sucesso")
+                print("✅ Login enviado")
             except Exception as e:
-                print("⚠️ Erro no login:", e)
+                screenshot_and_send(driver, "3 - Falha no Login")
+                print("⚠️ Falha no login:", e)
 
             time.sleep(8)
 
-            print_step("4 - Clicando Aviator novamente (segunda vez)")
+            print_step("4 - Clicando Aviator (2ª vez)")
             click_aviator_image(driver)
             time.sleep(6)
 
-            print_step("5 - Entrando no iframe Spribe / Bitville")
+            print_step("5 - Entrando no iframe (provider-game-iframe)")
             iframe_el = None
             for f in driver.find_elements(By.TAG_NAME, "iframe"):
                 try:
                     src = (f.get_attribute("src") or "").lower()
                     class_name = (f.get_attribute("class") or "").lower()
                     id_name = (f.get_attribute("id") or "").lower()
-                    print(f"   Candidato iframe → id={id_name} | class={class_name} | src={src[:100]}...")
 
-                    if ("bitville-api.com" in src or 
-                        "launch.spribegaming.com" in src or 
-                        "aviator-next.spribegaming.com" in src or 
-                        "spribe-iframe" in class_name or 
-                        "game-iframe" in class_name or 
-                        "provider-game-iframe" in id_name):
+                    if id_name == "provider-game-iframe" or "spribe-iframe" in class_name or "launch.spribegaming.com" in src:
                         iframe_el = f
-                        print("   ✅ IFRAME ENCONTRADO!")
+                        print("   ✅ IFRAME EXATO ENCONTRADO!")
+                        screenshot_and_send(driver, "5 - Iframe encontrado")
                         break
                 except:
                     continue
@@ -179,15 +178,19 @@ def iniciar_scraper():
             if iframe_el:
                 driver.switch_to.frame(iframe_el)
                 print("✅ Entrou no iframe com sucesso!")
+                screenshot_and_send(driver, "5 - Entrou no iframe")
             else:
-                raise RuntimeError("Iframe não encontrado")
+                screenshot_and_send(driver, "5 - Falha - Iframe não encontrado")
+                raise RuntimeError("Iframe não localizado")
 
             print_step("6 - Aguardando e capturando histórico")
             start_time = time.time()
             while time.time() - start_time < 90:
                 payouts = safe_find_elements(driver, "div.payouts-block div.payout, div.payout")
-                print(f"   Tentativa → {len(payouts)} payouts encontrados")
+                print(f"   Tentativa → {len(payouts)} payouts")
                 if len(payouts) > 0:
+                    print("✅ PAYOUTS ENCONTRADOS!")
+                    screenshot_and_send(driver, "6 - Payouts encontrados")
                     break
                 time.sleep(4)
 
@@ -195,6 +198,7 @@ def iniciar_scraper():
             with _history_lock:
                 global_history = historico[:]
             print(f"✅ Histórico inicial carregado: {len(historico)} itens")
+            screenshot_and_send(driver, "6 - Histórico inicial OK")
 
             # LOOP PRINCIPAL
             while True:
@@ -222,6 +226,7 @@ def iniciar_scraper():
             print(f"❌ ERRO: {type(e).__name__} - {e}")
             traceback.print_exc()
             send_telegram_text(f"🔥 ERRO: {type(e).__name__}")
+            screenshot_and_send(driver, "ERRO - Falha geral")
             time.sleep(15)
 
         finally:
@@ -251,7 +256,7 @@ def api_history():
 
 @app.route("/")
 def home():
-    return "EBET AVIATOR - FLUXO EXATO CORRIGIDO"
+    return "EBET AVIATOR - IFRAME EXATO + PRINT EM TODO PASSO"
 
 if __name__ == "__main__":
     threading.Thread(target=supervisor_thread, daemon=True).start()
